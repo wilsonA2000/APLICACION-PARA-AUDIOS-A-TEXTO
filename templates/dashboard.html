@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TranscribeAI Pro - Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎙️</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .upload-zone {
+            border: 2px dashed #e5e7eb;
+            transition: all 0.3s ease;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        .sidebar {
+            box-shadow: 4px 0 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .processing { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-microphone-alt text-2xl"></i>
+                <h1 class="text-2xl font-bold">TranscribeAI Pro</h1>
+            </div>
+            <nav class="flex items-center space-x-6">
+                <a href="#" class="hover:text-blue-200 transition">Dashboard</a>
+                <a href="#" class="hover:text-blue-200 transition">Historial</a>
+                <a href="#" class="hover:text-blue-200 transition">Configuración</a>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm">3 transcripciones diarias</span>
+                    <div class="w-24 bg-blue-800 rounded-full h-2">
+                        <div class="bg-yellow-400 h-2 rounded-full" style="width: 33%"></div>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <div class="flex h-screen pt-16">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white sidebar p-4">
+            <div class="mb-6">
+                <h3 class="text-gray-600 font-semibold mb-3">Accesos directos</h3>
+                <a href="#" class="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition">
+                    <i class="fas fa-clock text-gray-600"></i>
+                    <span>Archivos recientes</span>
+                </a>
+            </div>
+            
+            <div>
+                <h3 class="text-gray-600 font-semibold mb-3">Carpetas</h3>
+                <button class="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-100 transition w-full text-left">
+                    <i class="fas fa-folder-plus text-gray-600"></i>
+                    <span>Nueva carpeta</span>
+                </button>
+            </div>
+
+            <div class="mt-auto pt-8">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <h4 class="font-semibold text-blue-900 mb-2">Versión Premium</h4>
+                    <p class="text-sm text-blue-700 mb-3">Transcripciones ilimitadas y funciones avanzadas</p>
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition w-full">
+                        Actualizar ahora
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-8">
+            <!-- Upload Section -->
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-xl shadow-sm p-8 mb-8">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <i class="fas fa-file-audio text-blue-600 mr-3"></i>
+                        Nueva Transcripción
+                    </h2>
+                    
+                    <div id="uploadZone" class="upload-zone rounded-xl p-12 text-center cursor-pointer">
+                        <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                        <h3 class="text-xl font-semibold text-gray-700 mb-2">Arrastra tu archivo aquí</h3>
+                        <p class="text-gray-500 mb-4">o haz clic para seleccionar</p>
+                        <p class="text-sm text-gray-400">Formatos: MP3, WAV, M4A, OGG, FLAC • Máx: 500MB</p>
+                        <input type="file" id="fileInput" class="hidden" accept="audio/*">
+                    </div>
+
+                    <!-- File Info Display -->
+                    <div id="fileInfo" class="hidden mt-6 p-4 bg-blue-50 rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-file-audio text-blue-600 text-2xl"></i>
+                                <div>
+                                    <p class="font-semibold text-gray-800" id="fileName"></p>
+                                    <p class="text-sm text-gray-600" id="fileDetails"></p>
+                                </div>
+                            </div>
+                            <button id="removeFile" class="text-red-500 hover:text-red-700">
+                                <i class="fas fa-times-circle text-2xl"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Options -->
+                    <div id="transcribeOptions" class="hidden mt-6 grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Idioma</label>
+                            <select id="language" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="es">Español</option>
+                                <option value="en">English</option>
+                                <option value="pt">Português</option>
+                                <option value="fr">Français</option>
+                                <option value="de">Deutsch</option>
+                                <option value="it">Italiano</option>
+                                <option value="auto">Detectar automáticamente</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Número de hablantes</label>
+                            <input type="number" id="speakers" min="1" max="10" value="2" 
+                                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="timestamps" checked class="rounded text-blue-600">
+                                <span class="text-sm font-medium text-gray-700">Incluir marcas de tiempo</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Transcribe Button -->
+                    <button id="transcribeBtn" class="hidden mt-6 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center space-x-2">
+                        <i class="fas fa-magic"></i>
+                        <span>Transcribir con IA</span>
+                    </button>
+
+                    <!-- Progress -->
+                    <div id="progressSection" class="hidden mt-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">Procesando...</span>
+                            <span class="text-sm text-gray-600" id="progressPercent">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3">
+                            <div id="progressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-2" id="progressStatus">Preparando archivo...</p>
+                    </div>
+                </div>
+
+                <!-- Recent Files -->
+                <div class="bg-white rounded-xl shadow-sm p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-history text-blue-600 mr-3"></i>
+                        Archivos recientes
+                    </h3>
+                    <div id="recentFiles" class="space-y-2">
+                        <p class="text-gray-500 text-center py-8">No hay archivos recientes</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Transcription Modal -->
+    <div id="transcriptionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div class="p-6 border-b flex items-center justify-between">
+                <h3 class="text-xl font-bold">Transcripción completa</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto max-h-[60vh]">
+                <div id="transcriptionContent" class="prose max-w-none"></div>
+            </div>
+            <div class="p-6 border-t flex justify-end space-x-3">
+                <button onclick="downloadTranscription('txt')" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                    <i class="fas fa-download mr-2"></i>Descargar TXT
+                </button>
+                <button onclick="downloadTranscription('docx')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-file-word mr-2"></i>Descargar DOCX
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFile = null;
+        let transcriptionData = null;
+
+        // Upload handling
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const transcribeOptions = document.getElementById('transcribeOptions');
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const progressSection = document.getElementById('progressSection');
+
+        uploadZone.addEventListener('click', () => fileInput.click());
+        
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        document.getElementById('removeFile').addEventListener('click', () => {
+            currentFile = null;
+            fileInfo.classList.add('hidden');
+            transcribeOptions.classList.add('hidden');
+            transcribeBtn.classList.add('hidden');
+            uploadZone.classList.remove('hidden');
+        });
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            
+            const file = files[0];
+            if (!file.type.startsWith('audio/')) {
+                alert('Por favor selecciona un archivo de audio');
+                return;
+            }
+
+            currentFile = file;
+            uploadZone.classList.add('hidden');
+            fileInfo.classList.remove('hidden');
+            transcribeOptions.classList.remove('hidden');
+            transcribeBtn.classList.remove('hidden');
+
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileDetails').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+
+            // Upload file
+            uploadFile(file);
+        }
+
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('audiofile', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('fileDetails').textContent += ` • ${data.message}`;
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(err => {
+                alert('Error al subir el archivo');
+            });
+        }
+
+        transcribeBtn.addEventListener('click', () => {
+            if (!currentFile) return;
+
+            transcribeBtn.classList.add('hidden');
+            progressSection.classList.remove('hidden');
+            
+            startTranscription();
+        });
+
+        function startTranscription() {
+            const language = document.getElementById('language').value;
+            const speakers = document.getElementById('speakers').value;
+            const timestamps = document.getElementById('timestamps').checked;
+
+            // Simulate progress
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress > 95) progress = 95;
+                updateProgress(progress);
+            }, 1000);
+
+            fetch('/transcribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: currentFile.name,
+                    idioma: language,
+                    num_speakers: parseInt(speakers),
+                    timestamps: timestamps
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                if (data.success) {
+                    updateProgress(100);
+                    transcriptionData = data;
+                    setTimeout(() => {
+                        showTranscription(data);
+                        addToRecentFiles(currentFile.name);
+                        resetUpload();
+                    }, 1000);
+                } else {
+                    alert(data.message);
+                    resetUpload();
+                }
+            })
+            .catch(err => {
+                clearInterval(progressInterval);
+                alert('Error durante la transcripción');
+                resetUpload();
+            });
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressPercent').textContent = Math.round(percent) + '%';
+            
+            if (percent < 30) {
+                document.getElementById('progressStatus').textContent = 'Analizando audio...';
+            } else if (percent < 60) {
+                document.getElementById('progressStatus').textContent = 'Procesando con IA...';
+            } else if (percent < 90) {
+                document.getElementById('progressStatus').textContent = 'Generando transcripción...';
+            } else {
+                document.getElementById('progressStatus').textContent = 'Finalizando...';
+            }
+        }
+
+        function resetUpload() {
+            currentFile = null;
+            fileInfo.classList.add('hidden');
+            transcribeOptions.classList.add('hidden');
+            transcribeBtn.classList.add('hidden');
+            progressSection.classList.add('hidden');
+            uploadZone.classList.remove('hidden');
+            document.getElementById('progressBar').style.width = '0%';
+        }
+
+        function showTranscription(data) {
+            document.getElementById('transcriptionContent').innerHTML = 
+                `<pre class="whitespace-pre-wrap">${data.text}</pre>`;
+            document.getElementById('transcriptionModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('transcriptionModal').classList.add('hidden');
+        }
+
+        function downloadTranscription(format) {
+            if (!transcriptionData) return;
+            
+            const url = format === 'txt' ? transcriptionData.download_url : transcriptionData.download_docx;
+            window.location.href = url;
+        }
+
+        function addToRecentFiles(filename) {
+            const recentFiles = document.getElementById('recentFiles');
+            const date = new Date().toLocaleString('es-ES');
+            
+            const fileElement = document.createElement('div');
+            fileElement.className = 'flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition';
+            fileElement.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-file-audio text-blue-600"></i>
+                    <div>
+                        <p class="font-medium">${filename}</p>
+                        <p class="text-sm text-gray-500">${date}</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-green-600 font-medium">Completado</span>
+                    <button class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            `;
+            
+            if (recentFiles.children[0].textContent.includes('No hay archivos')) {
+                recentFiles.innerHTML = '';
+            }
+            recentFiles.insertBefore(fileElement, recentFiles.firstChild);
+        }
+    </script>
+</body>
+</html>

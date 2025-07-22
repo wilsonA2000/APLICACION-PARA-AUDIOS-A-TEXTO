@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Convertidor de Audio a Texto</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎤</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Note: For production, install Tailwind CSS locally instead of using CDN -->
+    <style>
+        .progress-bar {
+            height: 1.5rem;
+            background: linear-gradient(90deg, #38bdf8 0%, #6366f1 100%);
+            border-radius: 0.5rem;
+            transition: width 0.3s;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            line-height: 1.5rem;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
+        <h2 class="text-2xl font-bold text-center mb-6 text-indigo-600">Convertidor de Audio a Texto</h2>
+        <div id="alertBox" class="hidden bg-red-100 text-red-700 p-2 rounded text-center mb-4"></div>
+        <form id="uploadForm" enctype="multipart/form-data" class="space-y-4">
+            <input type="file" class="block w-full text-sm text-slate-700 border border-slate-300 rounded-lg cursor-pointer bg-slate-50 focus:outline-none" name="audiofile" accept="audio/*" required>
+            <button type="submit" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition">Subir archivo</button>
+        </form>
+        <div id="uploadProgress" class="mt-6" style="display:none;">
+            <label class="block mb-1 text-slate-700">Subiendo archivo...</label>
+            <div class="w-full bg-slate-200 rounded-lg overflow-hidden">
+                <div id="uploadBar" class="progress-bar" style="width: 0%">0%</div>
+            </div>
+        </div>
+        <div id="fileSuccess" class="hidden mt-6 text-green-700 text-center font-semibold">Archivo subido exitosamente.</div>
+        <div class="flex flex-col md:flex-row gap-2 mt-2">
+            <label for="idioma" class="font-semibold">Idioma:</label>
+            <select id="idioma" class="border border-slate-300 rounded px-2 py-1">
+                <option value="es">Español</option>
+                <option value="en">Inglés</option>
+                <option value="pt">Portugués</option>
+                <option value="fr">Francés</option>
+                <option value="it">Italiano</option>
+                <option value="de">Alemán</option>
+                <option value="ru">Ruso</option>
+                <option value="zh">Chino</option>
+                <option value="ja">Japonés</option>
+                <option value="ko">Coreano</option>
+                <option value="ar">Árabe</option>
+                <option value="tr">Turco</option>
+                <option value="pl">Polaco</option>
+                <option value="nl">Neerlandés</option>
+                <option value="sv">Sueco</option>
+                <option value="ca">Catalán</option>
+                <option value="gl">Gallego</option>
+                <option value="eu">Euskera</option>
+              </select>
+        </div>
+        <div class="flex flex-col md:flex-row gap-2 mt-2">
+            <label for="num_speakers" class="font-semibold">Cantidad de personas:</label>
+            <input id="num_speakers" type="number" min="1" max="10" value="2" class="border border-slate-300 rounded px-2 py-1 w-20">
+        </div>
+        <div class="flex items-center gap-2 mt-2">
+            <input id="franjas" type="checkbox" class="form-checkbox">
+            <label for="franjas">Transcribir en franjas de 10 minutos</label>
+        </div>
+        <button id="transcribeBtn" class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition mt-4 hidden">Transcribir a texto</button>
+        <div id="transcribeProgress" class="mt-6" style="display:none;">
+            <div class="spinner"></div>
+            <div class="text-center font-semibold text-indigo-600 mt-3" id="transcribeText">Transcribiendo...</div>
+        </div>
+        <div id="resultBox" class="hidden mt-6">
+            <div class="text-green-700 font-semibold mb-2">¡Transcripción exitosa!</div>
+            <textarea id="resultText" class="w-full h-40 p-2 border border-slate-300 rounded mb-2" readonly></textarea>
+            <a id="downloadLink" class="block w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white text-center font-semibold rounded-lg transition" href="#" download>Descargar TXT</a>
+        </div>
+    </div>
+    <script>
+    let uploadedFilename = null;
+    const alertBox = document.getElementById('alertBox');
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadBar = document.getElementById('uploadBar');
+    const fileSuccess = document.getElementById('fileSuccess');
+    const transcribeBtn = document.getElementById('transcribeBtn');
+    const transcribeProgress = document.getElementById('transcribeProgress');
+    const transcribeText = document.getElementById('transcribeText');
+    const resultBox = document.getElementById('resultBox');
+    const resultText = document.getElementById('resultText');
+    const downloadLink = document.getElementById('downloadLink');
+
+    function showAlert(msg) {
+        alertBox.innerText = msg;
+        alertBox.classList.remove('hidden');
+    }
+    function hideAlert() {
+        alertBox.classList.add('hidden');
+    }
+    // Validar archivo antes de subir
+    uploadForm.onsubmit = function(e) {
+        e.preventDefault();
+        hideAlert();
+        fileSuccess.classList.add('hidden');
+        transcribeBtn.classList.add('hidden');
+        resultBox.classList.add('hidden');
+        const fileInput = uploadForm.querySelector('input[type="file"]');
+        const file = fileInput.files[0];
+        if (!file) {
+            showAlert('Por favor selecciona un archivo de audio.');
+            return;
+        }
+        const allowedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/m4a', 'audio/ogg', 'audio/flac'];
+        if (!allowedTypes.includes(file.type)) {
+            showAlert('El archivo debe ser de tipo mp3, wav, m4a, ogg o flac.');
+            return;
+        }
+        if (file.size === 0) {
+            showAlert('El archivo está vacío.');
+            return;
+        }
+        uploadProgress.style.display = 'block';
+        uploadBar.style.width = '0%';
+        uploadBar.innerText = '0%';
+        const formData = new FormData(uploadForm);
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                var percent = Math.round((e.loaded / e.total) * 100);
+                uploadBar.style.width = percent + '%';
+                uploadBar.innerText = percent + '%';
+            }
+        };
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4) {
+                uploadProgress.style.display = 'none';
+                if (xhr.status == 200) {
+                    const resp = JSON.parse(xhr.responseText);
+                    if (resp.success) {
+                        uploadedFilename = resp.filename;
+                        fileSuccess.classList.remove('hidden');
+                        transcribeBtn.classList.remove('hidden');
+                    } else {
+                        showAlert(resp.message || 'Error al subir el archivo.');
+                    }
+                } else {
+                    showAlert('Error al subir el archivo.');
+                }
+            }
+        };
+        xhr.open('POST', '/upload', true);
+        xhr.send(formData);
+    };
+    transcribeBtn.onclick = function() {
+        hideAlert();
+        resultBox.classList.add('hidden');
+        transcribeBtn.classList.add('hidden');
+        transcribeProgress.style.display = 'block';
+        transcribeText.innerText = 'Transcribiendo... 0%';
+        let percent = 0;
+        let interval = setInterval(function() {
+            if (percent < 99) {
+                percent += Math.floor(Math.random() * 5) + 1;
+                if (percent > 99) percent = 99;
+                transcribeText.innerText = 'Transcribiendo... ' + percent + '%';
+            }
+        }, 400);
+        const idioma = document.getElementById('idioma').value;
+        const num_speakers = parseInt(document.getElementById('num_speakers').value) || 2;
+        const franjas = document.getElementById('franjas').checked;
+        fetch('/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: uploadedFilename, idioma, num_speakers, franjas })
+        })
+        .then(res => res.json())
+        .then(data => {
+            clearInterval(interval);
+            transcribeProgress.style.display = 'none';
+            if (data.success) {
+                resultBox.classList.remove('hidden');
+                resultText.value = data.text;
+                downloadLink.href = data.download_url;
+                // Mostrar botón para descargar Word
+                if (!document.getElementById('downloadDocx')) {
+                    const docxBtn = document.createElement('a');
+                    docxBtn.id = 'downloadDocx';
+                    docxBtn.className = 'block w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white text-center font-semibold rounded-lg transition mt-2';
+                    docxBtn.innerText = 'Descargar Word';
+                    docxBtn.href = data.download_docx;
+                    docxBtn.download = 'transcripcion.docx';
+                    downloadLink.parentNode.appendChild(docxBtn);
+                } else {
+                    document.getElementById('downloadDocx').href = data.download_docx;
+                }
+            } else {
+                showAlert(data.message || 'Error al transcribir el archivo.');
+                transcribeBtn.classList.remove('hidden');
+            }
+        })
+        .catch(() => {
+            clearInterval(interval);
+            transcribeProgress.style.display = 'none';
+            showAlert('Error al transcribir el archivo.');
+            transcribeBtn.classList.remove('hidden');
+        });
+    };
+    </script>
+</body>
+</html>
